@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/local/tutti/internal/api"
+	"github.com/local/tutti/internal/ascii"
 	"github.com/local/tutti/internal/db"
 )
 
@@ -23,9 +24,10 @@ var (
 	flagSort     string
 	flagLimit    int
 	flagPages    int
-	flagNoSave   bool
-	flagJSON     bool
-	flagMD       bool
+	flagNoSave      bool
+	flagJSON        bool
+	flagMD          bool
+	flagWithPreviews bool
 )
 
 var searchCmd = &cobra.Command{
@@ -57,6 +59,7 @@ func init() {
 	searchCmd.Flags().BoolVar(&flagNoSave, "no-save", false, "Don't save results to local database")
 	searchCmd.Flags().BoolVar(&flagJSON, "json", false, "Output raw JSON")
 	searchCmd.Flags().BoolVar(&flagMD, "md", false, "Output Markdown")
+	searchCmd.Flags().BoolVar(&flagWithPreviews, "with-previews", false, "Fetch and render listing thumbnails as ASCII art")
 }
 
 func runSearch(query string) error {
@@ -182,15 +185,15 @@ func runSearch(query string) error {
 	}
 
 	if flagMD {
-		printMarkdown(query, filtered, totalCount, rx, stats)
+		printMarkdown(query, filtered, totalCount, rx, stats, flagWithPreviews)
 		return nil
 	}
 
-	printResults(query, filtered, totalCount, rx, stats)
+	printResults(query, filtered, totalCount, rx, stats, flagWithPreviews)
 	return nil
 }
 
-func printResults(query string, listings []api.Listing, totalCount int, rx *regexp.Regexp, stats *db.PriceStats) {
+func printResults(query string, listings []api.Listing, totalCount int, rx *regexp.Regexp, stats *db.PriceStats, withPreviews bool) {
 	rxNote := ""
 	if rx != nil {
 		rxNote = fmt.Sprintf(" (regexp filter: %s)", rx.String())
@@ -232,6 +235,20 @@ func printResults(query string, listings []api.Listing, totalCount int, rx *rege
 		u := api.ListingURL(l.SEOInformation.DESlug)
 
 		fmt.Printf("%s\n", sep)
+
+		// ASCII preview
+		if withPreviews {
+			if src := l.Thumbnail.NormalRendition.Src; src != "" {
+				if img, err := ascii.Fetch(src); err == nil {
+					art := ascii.RenderColored(img, 72)
+					// Indent each line by 4 spaces
+					for _, line := range strings.Split(strings.TrimRight(art, "\n"), "\n") {
+						fmt.Printf("    %s\n", line)
+					}
+				}
+			}
+		}
+
 		fmt.Printf("[%d] %s\n", i+1, l.Title)
 		fmt.Printf("    Price: %s%s\n", priceStr, priceCategory)
 		fmt.Printf("    Location: %s  |  %s  |  Seller: %s\n", loc, age, l.SellerInfo.Alias)
@@ -254,7 +271,7 @@ func printResults(query string, listings []api.Listing, totalCount int, rx *rege
 	}
 }
 
-func printMarkdown(query string, listings []api.Listing, totalCount int, rx *regexp.Regexp, stats *db.PriceStats) {
+func printMarkdown(query string, listings []api.Listing, totalCount int, rx *regexp.Regexp, stats *db.PriceStats, withPreviews bool) {
 	rxNote := ""
 	if rx != nil {
 		rxNote = fmt.Sprintf(" · regexp `%s`", rx.String())
@@ -308,6 +325,14 @@ func printMarkdown(query string, listings []api.Listing, totalCount int, rx *reg
 		}
 
 		fmt.Printf("### %d. %s\n\n", i+1, title)
+
+		// In markdown mode, embed thumbnail as an image link
+		if withPreviews {
+			if src := l.Thumbnail.NormalRendition.Src; src != "" {
+				fmt.Printf("![thumbnail](%s)\n\n", src)
+			}
+		}
+
 		fmt.Printf("**Price:** %s%s  \n", priceStr, priceCategory)
 		fmt.Printf("**Location:** %s  · **Age:** %s  · **Seller:** %s\n\n", loc, age, l.SellerInfo.Alias)
 

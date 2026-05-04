@@ -14,6 +14,7 @@ Unofficial command-line interface for [tutti.ch](https://www.tutti.ch) — Switz
 - **Multi-page fetch** — `--pages 3` fetches up to 90 results in one command
 - **Price analysis** — shows median/quartiles across all tracked results and labels each listing (very cheap / below median / above median / expensive)
 - **Local price database** — results are saved to `~/.tutti/db.sqlite` and tracked across searches; price changes are recorded
+- **ASCII image previews** — `--with-previews` fetches listing thumbnails and renders them as ANSI true-color ASCII art in the terminal; in `--md` mode it embeds the image URL instead
 - **Multiple output formats** — plain text (default), `--json`, `--md` (Markdown table)
 
 ## Installation
@@ -59,6 +60,10 @@ tutti search "macbook" --regexp "m[123]" --min-price 400 --max-price 1200 --loca
 # Markdown output (great for piping to a file or Obsidian)
 tutti search "iphone 15 pro" --md
 
+# ASCII image previews (ANSI true-color in terminal, image links in --md)
+tutti search "macbook air" --with-previews --limit 5
+tutti search "iphone 15 pro" --md --with-previews
+
 # JSON output
 tutti search "iphone 15" --json | jq '.listings[].formattedPrice'
 
@@ -93,6 +98,7 @@ tutti token "iphone 15 pro"
 | `--no-save` | false | Skip saving results to local database |
 | `--json` | false | Output raw JSON |
 | `--md` | false | Output Markdown |
+| `--with-previews` | false | Render thumbnails as ANSI ASCII art (terminal) or `![img](url)` (--md) |
 
 ## Example output
 

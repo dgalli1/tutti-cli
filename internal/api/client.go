@@ -163,6 +163,7 @@ var gqlQuery = `query SearchListingsByConstraints($query: String, $constraints: 
         primaryCategory { categoryID }
         sellerInfo { alias }
         images(first: 1) { __typename }
+        thumbnail { normalRendition: rendition(width: 235, height: 167) { src } }
         seoInformation { deSlug: slug(language: DE) }
       }}
     }

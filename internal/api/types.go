@@ -43,7 +43,12 @@ type Listing struct {
 	SEOInformation struct {
 		DESlug string `json:"deSlug"`
 	} `json:"seoInformation"`
-	Images []struct{} `json:"images"`
+	Images    []struct{} `json:"images"`
+	Thumbnail struct {
+		NormalRendition struct {
+			Src string `json:"src"`
+		} `json:"normalRendition"`
+	} `json:"thumbnail"`
 }
 
 // NextDataResponse is the shape returned by the _next/data endpoint
