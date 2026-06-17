@@ -10,8 +10,11 @@ Unofficial command-line interface for [tutti.ch](https://www.tutti.ch) — Switz
 - **Regexp filtering** — fetch a broad query, filter client-side with a regexp (`--regexp "m1|m2|air"`)
 - **Price range filter** — `--min-price` / `--max-price` in CHF
 - **Location filter** — canton or city substring match
+- **Radius filter** — `--from-postcode 8001 --radius-km 20` keeps only listings within N km of a Swiss PLZ (haversine distance, official swisstopo PLZ centroids)
 - **Sorting** — `newest`, `oldest`, `price_asc`, `price_desc`
-- **Multi-page fetch** — `--pages 3` fetches up to 90 results in one command
+- **Multi-page fetch** — `--pages 3` fetches 3 × 30 results; `--pages 0` keeps paging until the result set is exhausted
+- **Date cutoff** — `--since 2026-06-17T08:00:00Z` stops paging once listings are older than the cutoff (ideal for daily diffs)
+- **Rate-limit friendly** — `--page-delay 1s` waits between page fetches (default 1s; set to `0` to disable)
 - **Price analysis** — shows median/quartiles across all tracked results and labels each listing (very cheap / below median / above median / expensive)
 - **Local price database** — results are saved to `~/.tutti/db.sqlite` and tracked across searches; price changes are recorded
 - **ASCII image previews** — `--with-previews` fetches listing thumbnails and renders them as ANSI true-color ASCII art in the terminal; in `--md` mode it embeds the image URL instead
@@ -48,11 +51,28 @@ tutti search "macbook" --min-price 300 --max-price 1500
 # Location filter
 tutti search "velo" --location "zürich"
 
+# Radius filter: only listings within N km of a Swiss PLZ
+tutti search "iphone" --from-postcode 8001 --radius-km 20
+tutti search "velo" --from-postcode 3011 --radius-km 50 --sort newest
+
 # Sort by price ascending
 tutti search "fahrrad" --sort price_asc
 
-# Fetch multiple pages (3 × 30 = up to 90 results)
+# Fetch multiple pages (3 × 30 = 90 results)
 tutti search "möbel" --pages 3
+
+# Fetch every page (no cap)
+tutti search "macbook" --pages 0
+
+# Daily diff: only fetch listings newer than the last time you ran this query
+tutti search "macbook" --since 2026-06-17T08:00:00Z
+
+# Rate-limit-friendly multi-page fetch (1s between pages, the default)
+tutti search "macbook" --pages 0
+# Or with an explicit custom delay
+tutti search "macbook" --pages 0 --page-delay 2s
+# Disable the throttle entirely (only if you know what you're doing)
+tutti search "macbook" --pages 0 --page-delay 0
 
 # Combine filters
 tutti search "macbook" --regexp "m[123]" --min-price 400 --max-price 1200 --location "zürich" --sort price_asc --pages 2
@@ -91,10 +111,14 @@ tutti token "iphone 15 pro"
 | `--min-price` | 0 | Minimum price in CHF |
 | `--max-price` | 0 | Maximum price in CHF |
 | `--location` | — | Location substring filter (city or canton) |
+| `--from-postcode` | — | 4-digit Swiss PLZ (e.g. `8001`); origin for `--radius-km` |
+| `--radius-km` | 0 | Maximum km from `--from-postcode` (client-side haversine; 0 disables the filter) |
 | `--category` | — | Category ID filter |
 | `--sort` | `newest` | `newest`, `oldest`, `price_asc`, `price_desc` |
 | `--limit` | 30 | Results per page (max ~100) |
-| `--pages` | 1 | Number of pages to fetch |
+| `--pages` | 1 | Number of pages to fetch (`0` = fetch all) |
+| `--page-delay` | `1s` | Delay between page fetches (`0` disables; use `--page-delay 0` to skip the throttle) |
+| `--since` | — | RFC3339 timestamp; stop paging once listings are older than this (requires `--sort newest` or `--sort oldest`) |
 | `--no-save` | false | Skip saving results to local database |
 | `--json` | false | Output raw JSON |
 | `--md` | false | Output Markdown |
