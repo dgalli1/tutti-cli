@@ -16,17 +16,17 @@ type DB struct {
 }
 
 type StoredListing struct {
-	ListingID  string
-	Title      string
-	Price      int // CHF integer
-	PriceStr   string
-	Location   string
-	Canton     string
-	URL        string
-	Query      string
-	FirstSeen  time.Time
-	LastSeen   time.Time
-	SeenCount  int
+	ListingID string
+	Title     string
+	Price     int // CHF integer
+	PriceStr  string
+	Location  string
+	Canton    string
+	URL       string
+	Query     string
+	FirstSeen time.Time
+	LastSeen  time.Time
+	SeenCount int
 }
 
 type PriceStats struct {
@@ -48,7 +48,16 @@ func Open() (*DB, error) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, err
 	}
-	path := filepath.Join(dir, "db.sqlite")
+	return OpenAt(filepath.Join(dir, "db.sqlite"))
+}
+
+// OpenAt opens (and migrates) a SQLite database at the given path. The
+// directory is created if it doesn't exist. Intended for tests and for
+// callers that want to use a non-default location.
+func OpenAt(path string) (*DB, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return nil, err
+	}
 	conn, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, err
@@ -112,11 +121,20 @@ func (d *DB) UpsertListing(l StoredListing) error {
 	rows, _ := res.RowsAffected()
 	if rows > 0 && l.Price > 0 {
 		var lastPrice int
-		d.db.QueryRow(`SELECT price FROM price_history WHERE listing_id=? ORDER BY recorded_at DESC LIMIT 1`, l.ListingID).Scan(&lastPrice)
-		if lastPrice != l.Price {
+		// Tie-break on `id` so multiple readings in the same second don't
+		// flip-flop between old and new values.
+		scanErr := d.db.QueryRow(`SELECT price FROM price_history WHERE listing_id=? ORDER BY recorded_at DESC, id DESC LIMIT 1`, l.ListingID).Scan(&lastPrice)
+		switch scanErr {
+		case nil:
+			if lastPrice != l.Price {
+				_, err = d.db.Exec(`INSERT INTO price_history (listing_id, price, price_str, recorded_at) VALUES (?, ?, ?, ?)`,
+					l.ListingID, l.Price, l.PriceStr, now)
+			}
+		case sql.ErrNoRows:
 			_, err = d.db.Exec(`INSERT INTO price_history (listing_id, price, price_str, recorded_at) VALUES (?, ?, ?, ?)`,
 				l.ListingID, l.Price, l.PriceStr, now)
 		}
+		// any other DB error: skip history insert silently
 	}
 	return err
 }
